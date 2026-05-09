@@ -1,11 +1,37 @@
-#!/usr/bin/env python3
-"""
-Hermes Agent CLI launcher.
+#!/bin/bash
+# Repo-local Hermes launcher.
+#
+# Prefers the checkout's virtualenv so `./hermes` works without needing to
+# activate it first, matching the contributor docs. Falls back to `python3`
+# when no local venv exists.
 
-This wrapper should behave like the installed `hermes` command, including
-subcommands such as `gateway`, `cron`, and `doctor`.
-"""
+set -euo pipefail
 
-if __name__ == "__main__":
-    from hermes_cli.main import main
-    main()
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [ -x "$SCRIPT_DIR/.venv/bin/python" ]; then
+    PYTHON_BIN="$SCRIPT_DIR/.venv/bin/python"
+elif [ -x "$SCRIPT_DIR/venv/bin/python" ]; then
+    PYTHON_BIN="$SCRIPT_DIR/venv/bin/python"
+else
+    PYTHON_BIN="${PYTHON:-python3}"
+fi
+
+if ! "$PYTHON_BIN" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1; then
+    cat >&2 <<EOF
+Hermes Agent requires Python 3.11 or newer.
+
+Current interpreter: $PYTHON_BIN
+
+Quick fix:
+  ./setup-hermes.sh
+
+Manual fix:
+  uv venv .venv --python 3.11
+  source .venv/bin/activate
+  uv pip install -e ".[all,dev]"
+EOF
+    exit 1
+fi
+
+exec "$PYTHON_BIN" -m hermes_cli.main "$@"
